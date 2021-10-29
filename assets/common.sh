@@ -121,8 +121,6 @@ log_in() {
   if [ -n "${username}" ] && [ -n "${password}" ]; then
     echo "${password}" | docker login -u "${username}" --password-stdin ${registry}
   else
-    mkdir -p ~/.docker
-    touch ~/.docker/config.json
     # This ensures the resulting JSON object remains syntactically valid
     echo "$(cat ~/.docker/config.json){\"credsStore\":\"ecr-login\"}" | jq -s add > ~/.docker/config.json
   fi
@@ -212,4 +210,30 @@ docker_pull() {
 
   printf "\n${RED}Failed to pull image %s.${NC}" "$1"
   return 1
+}
+
+log_in_multi() {
+  mkdir -p ~/.docker
+  touch ~/.docker/config.json
+
+  local json="${1}"
+  local creds_count="$(echo "$json" | jq -r '. | length')"
+
+  for i in $( seq 0 $(expr "$creds_count" -1 ));
+  do
+    export AWS_ACCESS_KEY_ID=$(jq -r '[$i].aws_access_key_id' < $json)
+    export AWS_SECRET_ACCESS_KEY=$(jq -r '[$i].aws_secret_access_key' < $json)
+    export AWS_SESSION_TOKEN=$(jq -r '[$i].aws_session_token' < $json)
+    local username=$(jq -r '[$i].username' < $json)
+    local password=$(jq -r '[$i].password' < $json)
+    local repository=$(jq -r '[$i].repository' < $json)
+
+    if private_registry "${repository}" ; then
+      registry="$(extract_registry "${repository}")"
+    else
+      registry=
+    fi
+
+    log_in "$username" "$password" "$registry"
+  done
 }

@@ -292,9 +292,9 @@ resources:
 - name: git-resource-image
   type: docker-image
   source:
-    repository: concourse/git-resource
-    username: username
-    password: password
+    - repository: concourse/git-resource
+      username: username
+      password: password
 
 - name: git-resource-rootfs
   type: s3
